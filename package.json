@@ -1,0 +1,133 @@
+{
+  "name": "remove-profanity",
+  "version": "1.0.1",
+  "description": "Profanity filter for Hindi, English and nine more Indian languages: detects abuse in Devanagari, Bengali, Gurmukhi, Gujarati, Odia, Tamil, Telugu, Kannada and Malayalam, and in romanized Hinglish, Banglish, Tanglish, Tenglish, Kanglish, Manglish, Punglish and Odlish, with evasion resistance, per-word severity and categories. Zero dependencies, offline, TypeScript.",
+  "keywords": [
+    "profanity",
+    "profanity-filter",
+    "bad-words",
+    "swear-filter",
+    "censor",
+    "censorship",
+    "content-moderation",
+    "chat-moderation",
+    "text-moderation",
+    "abuse-detection",
+    "hindi",
+    "hinglish",
+    "indian-languages",
+    "indic",
+    "devanagari",
+    "bengali",
+    "banglish",
+    "tamil",
+    "tanglish",
+    "telugu",
+    "tenglish",
+    "kannada",
+    "kanglish",
+    "malayalam",
+    "manglish",
+    "marathi",
+    "gujarati",
+    "punjabi",
+    "punglish",
+    "gurmukhi",
+    "odia",
+    "odlish",
+    "unicode",
+    "typescript",
+    "zero-dependencies"
+  ],
+  "author": "Ankit",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "remove-profanity-mcp": "./dist/mcp/stdio.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./data/hi": {
+      "types": "./dist/data/hi.d.ts",
+      "import": "./dist/data/hi.js",
+      "default": "./dist/data/hi.js"
+    },
+    "./data/en": {
+      "types": "./dist/data/en.d.ts",
+      "import": "./dist/data/en.js",
+      "default": "./dist/data/en.js"
+    },
+    "./data/ta": {
+      "types": "./dist/data/ta.d.ts",
+      "import": "./dist/data/ta.js",
+      "default": "./dist/data/ta.js"
+    },
+    "./data/or": {
+      "types": "./dist/data/or.d.ts",
+      "import": "./dist/data/or.js",
+      "default": "./dist/data/or.js"
+    },
+    "./data/bn": {
+      "types": "./dist/data/bn.d.ts",
+      "import": "./dist/data/bn.js",
+      "default": "./dist/data/bn.js"
+    },
+    "./data/mr": {
+      "types": "./dist/data/mr.d.ts",
+      "import": "./dist/data/mr.js",
+      "default": "./dist/data/mr.js"
+    },
+    "./data/te": {
+      "types": "./dist/data/te.d.ts",
+      "import": "./dist/data/te.js",
+      "default": "./dist/data/te.js"
+    },
+    "./data/kn": {
+      "types": "./dist/data/kn.d.ts",
+      "import": "./dist/data/kn.js",
+      "default": "./dist/data/kn.js"
+    },
+    "./data/ml": {
+      "types": "./dist/data/ml.d.ts",
+      "import": "./dist/data/ml.js",
+      "default": "./dist/data/ml.js"
+    },
+    "./data/pa": {
+      "types": "./dist/data/pa.d.ts",
+      "import": "./dist/data/pa.js",
+      "default": "./dist/data/pa.js"
+    },
+    "./data/gu": {
+      "types": "./dist/data/gu.d.ts",
+      "import": "./dist/data/gu.js",
+      "default": "./dist/data/gu.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "llms.txt",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
