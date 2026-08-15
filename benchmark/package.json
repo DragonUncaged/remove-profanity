@@ -1,0 +1,13 @@
+{
+  "name": "remove-profanity-benchmark",
+  "private": true,
+  "type": "module",
+  "description": "Head-to-head benchmark. Not published with the package.",
+  "dependencies": {
+    "allprofanity": "^2.4.0",
+    "obscenity": "^0.4.6",
+    "leo-profanity": "^1.9.0",
+    "bad-words": "^4.0.0",
+    "@2toad/profanity": "^3.1.0"
+  }
+}
