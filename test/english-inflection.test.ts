@@ -126,8 +126,13 @@ describe('english inflection — whole tokens, not relaxed boundaries', () => {
 const DICT = '/usr/share/dict/words';
 const haveDict = existsSync(DICT);
 
-describe.skipIf(!haveDict)('english inflection — dictionary sweep', () => {
-	const words = [
+// `describe.skipIf` still RUNS the callback to collect the tests, so the read
+// has to be behind a guard that returns early — same shape as
+// test/punjabi-gujarati-dictionary.test.ts and
+// test/all-packs-dictionary-sweep.test.ts.
+function loadDictionary(): string[] {
+	if (!haveDict) return [];
+	return [
 		...new Set(
 			readFileSync(DICT, 'utf8')
 				.split('\n')
@@ -135,7 +140,11 @@ describe.skipIf(!haveDict)('english inflection — dictionary sweep', () => {
 				.filter((w) => w.length > 0),
 		),
 	];
+}
 
+const words: string[] = loadDictionary();
+
+describe.skipIf(!haveDict)('english inflection — dictionary sweep', () => {
 	it('flags exactly the pinned set of dictionary words', () => {
 		const hits = words.filter((w) => flags(w)).sort();
 		expect(hits).toEqual([
