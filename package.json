@@ -37,9 +37,15 @@
     "odlish",
     "unicode",
     "typescript",
-    "zero-dependencies"
+    "zero-dependencies",
+    "nodejs",
+    "javascript",
+    "leetspeak",
+    "homoglyphs",
+    "evasion-detection",
+    "bad-words-alternative"
   ],
-  "author": "Ankit",
+  "author": "DragonUncaged",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",

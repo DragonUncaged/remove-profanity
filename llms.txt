@@ -1,0 +1,391 @@
+# remove-profanity
+
+> Offline profanity/abuse detector for English and ten Indian languages, in
+> native script and in romanized form (Hinglish, Banglish, Tanglish, …). Zero
+> runtime dependencies, TypeScript types bundled, ESM.
+
+## What it does, and does not
+
+- DOES: detect listed profanity in Devanagari, Bengali, Gurmukhi, Gujarati,
+  Odia, Tamil, Telugu, Kannada, Malayalam and Latin script; resolve evasions
+  (leetspeak, Unicode homoglyphs, zero-width injection, letter stretching,
+  interior masks like `f*ck`, spelled-out `s.h.i.*`, chunk splits `as sh o*e`);
+  report severity 0-4, categories, and exact character spans; censor in
+  grapheme clusters.
+- DOES NOT: classify toxicity, harassment, sarcasm, or intent; detect
+  languages; call any network service; learn from data. It is a dictionary
+  plus a matching engine. Its output is a signal for your policy, not a
+  verdict.
+- KNOWN MISSES (deliberate, not bugs): mixed-script words (`मा` + `darch*d`),
+  disemvowelling (`fck`), masks at a token edge (`f***`, `*uck`), two
+  space-separated chunks (`fu c*`), doubled separators (`f..uc*`).
+
+## Install
+
+```
+npm install remove-profanity
+```
+
+Requires Node >= 18. The package is ESM only (`"type": "module"`).
+
+ESM:
+
+```js
+import { createMatcher } from 'remove-profanity';
+import { hindi } from 'remove-profanity/data/hi';
+```
+
+CommonJS (dynamic import; there is no CJS build):
+
+```js
+const { createMatcher } = await import('remove-profanity');
+const { hindi } = await import('remove-profanity/data/hi');
+```
+
+## MCP server — you may not need to write code at all
+
+The package ships an MCP server as a bin, `remove-profanity-mcp`. If you are an
+agent with an MCP client, calling it is usually better than writing code against
+the library: no build step, and the matcher is constructed once at launch
+instead of once per script run. Still zero runtime dependencies — the stdio
+JSON-RPC transport is implemented directly, not via `@modelcontextprotocol/sdk`.
+
+Client configuration:
+
+```json
+{
+  "mcpServers": {
+    "remove-profanity": {
+      "command": "npx",
+      "args": ["-y", "-p", "remove-profanity", "remove-profanity-mcp"]
+    }
+  }
+}
+```
+
+`-p remove-profanity` is required: the bin lives inside that package rather than
+in one named after itself.
+
+Four tools, all read-only:
+
+| Tool | Input | Output |
+|---|---|---|
+| `check_text` | `text`, `languages?`, `minSeverity?` | `clean`, `matchCount`, `maxSeverity`, `languages` |
+| `scan_text` | same | `matches[]` (`surface`, `lemma`, `language`, `severity`, `categories`, `tier`, `casualUse`, `start`, `end`), `matchCount`, `maxSeverity`, `languages` |
+| `censor_text` | same plus `mask?`, `keepFirst?` | `censored`, `matchCount`, `maxSeverity`, `languages` |
+| `list_languages` | none | `languages[]` (`code`, `name`, `scripts`, `lemmaCount`), `defaultLanguages` |
+
+There is deliberately NO tool to add a word, edit an allowlist, read a file,
+spawn a process or reach the network. A word list the model can edit is a filter
+the text under review can talk into switching itself off. Use the library's
+`customWords` / `customAllowlist` if you need custom terms.
+
+Which packs load: all eleven by default (~53 ms from launch to ready, of which
+~19 ms is Node's own boot). Narrow with `--languages hi,en` or
+`REMOVE_PROFANITY_LANGUAGES=hi,en`, and narrow per call with the `languages`
+argument. Full manual, including the protocol coverage table: `docs/mcp.md`.
+
+## Exports
+
+From `remove-profanity`:
+
+```ts
+function createMatcher(options: MatcherOptions): Matcher;
+
+interface Matcher {
+  scan(text: string): ScanResult;
+  isClean(text: string): boolean;
+  censor(text: string, options?: CensorOptions): string;
+}
+
+function censorText(
+  text: string,
+  spans: { start: number; end: number }[],
+  options?: CensorOptions,
+): string;
+
+function skeletonKey(word: string): string;
+```
+
+Exported types: `Category`, `CensorOptions`, `LanguagePack`, `LemmaEntry`,
+`Matcher`, `MatcherOptions`, `MatchTier`, `ProfanityMatch`, `ScanResult`,
+`Severity`.
+
+`censorText` masks spans you supply yourself (e.g. after filtering `scan()`
+results by your own rules). `skeletonKey` exposes the phonetic key used by the
+skeleton tier; it is a debugging aid for pack authors, not a filter.
+
+## Options — every field, type, and default
+
+`MatcherOptions` (passed to `createMatcher`):
+
+| Field | Type | Default |
+|---|---|---|
+| `packs` | `LanguagePack[]` | required |
+| `minSeverity` | `0 \| 1 \| 2 \| 3 \| 4` | `0` |
+| `categories` | `Category[]` | undefined (all categories reported) |
+| `skeletonTier` | `boolean \| 'flag'` | `true` |
+| `maskedTier` | `boolean` | `true` |
+| `customWords` | `string[]` | undefined (none) |
+| `customAllowlist` | `string[]` | undefined (none) |
+
+- `minSeverity` — suppress matches strictly below this value. Default `0`
+  reports EVERYTHING the loaded packs list, mild insults included.
+- `categories` — if set, only matches carrying at least one listed category
+  are reported.
+- `skeletonTier` — the high-recall phonetic tier. `true` = on, matches look
+  like any other; `'flag'` = on, and the caller is expected to review rather
+  than block (matches carry `tier: 'skeleton'` either way); `false` = off.
+- `maskedTier` — resolve masked tokens (`f*ck`, `bh#sd*ke`) against the
+  dictionary. Mask characters are `* # @ $ %`, one to three per token, never
+  at a token edge.
+- `customWords` — extra terms, registered as `language: 'custom'`,
+  `severity: 2`, `categories: ['general']`.
+- `customAllowlist` — extra phrases that must never match.
+
+`CensorOptions` (passed to `matcher.censor` / `censorText`):
+
+| Field | Type | Default |
+|---|---|---|
+| `mask` | `string` | `'*'` |
+| `keepFirst` | `boolean` | `false` |
+
+`mask` is repeated once per grapheme cluster of the match. `keepFirst` leaves
+the first grapheme cluster visible.
+
+`Severity` = `0 | 1 | 2 | 3 | 4` (4 = extreme slur / sexual-violence term,
+3 = strong profanity, 2 = moderate insult, 1 = mild insult).
+
+`Category` = `'slur' | 'casteist' | 'religious' | 'gendered' | 'sexual' |
+'ableist' | 'violence' | 'general'`.
+
+## What `scan()` returns
+
+```ts
+interface ScanResult {
+  matches: ProfanityMatch[];
+  maxSeverity: Severity | null;   // null when matches is empty, NOT 0
+}
+
+interface ProfanityMatch {
+  lemma: string;        // canonical entry, native script where one exists
+  surface: string;      // exact slice of the ORIGINAL text that matched
+  tier: 'exact' | 'masked' | 'separated' | 'skeleton';
+  language: string;     // ISO 639-1 code of the matching pack, or 'custom'
+  severity: 0 | 1 | 2 | 3 | 4;
+  categories: Category[];
+  start: number;        // UTF-16 code-unit index into the ORIGINAL string
+  end: number;          // exclusive
+  casualUse: boolean;   // term is often conversational, not abusive
+}
+```
+
+Concrete example, using a benign custom word so the output is printable:
+
+```js
+const matcher = createMatcher({ packs: [english], customWords: ['heck'] });
+matcher.scan('what the heck');
+// {
+//   matches: [{
+//     lemma: 'heck', surface: 'heck', tier: 'exact', language: 'custom',
+//     severity: 2, categories: ['general'], casualUse: false,
+//     start: 9, end: 13
+//   }],
+//   maxSeverity: 2
+// }
+```
+
+`start`/`end` index the string you passed in, so slicing, highlighting and
+censoring against the original text are safe — all normalization happens on
+internal shadow copies with offset maps.
+
+## Per-language subpath imports
+
+| Import | Export |
+|---|---|
+| `remove-profanity/data/hi` | `hindi` |
+| `remove-profanity/data/en` | `english` |
+| `remove-profanity/data/ta` | `tamil` |
+| `remove-profanity/data/bn` | `bengali` |
+| `remove-profanity/data/mr` | `marathi` |
+| `remove-profanity/data/or` | `odia` |
+| `remove-profanity/data/te` | `telugu` |
+| `remove-profanity/data/kn` | `kannada` |
+| `remove-profanity/data/ml` | `malayalam` |
+| `remove-profanity/data/pa` | `punjabi` |
+| `remove-profanity/data/gu` | `gujarati` |
+
+Load only the languages the application actually needs. Each pack is
+self-sufficient — it carries the romanizations it shares with other packs, so
+you never need Hindi loaded to catch a borrowed word in Marathi. Measured, ten
+of the eleven packs score identically alone and with all eleven loaded.
+
+Loading everything costs two things:
+
+1. Construction time: 33.71 ms cold for all eleven, versus a few ms for one or
+   two.
+2. Cross-language false positives: a word innocent in one language may be
+   listed in another. Measured, Marathi has zero false positives on its own
+   clean suite alone and one with all eleven loaded.
+
+Per-CHECK cost is nearly flat past the first two packs: `en`+`hi` to all
+eleven adds 212 lemmas and moves a 20,000-word check by 0%.
+
+## Recipes
+
+### 1. Moderate a chat message
+
+```js
+import { createMatcher } from 'remove-profanity';
+import { hindi } from 'remove-profanity/data/hi';
+import { english } from 'remove-profanity/data/en';
+
+// Build ONCE at module scope. Construction is the expensive part.
+const matcher = createMatcher({ packs: [hindi, english] });
+
+export function moderate(message) {
+  const { matches, maxSeverity } = matcher.scan(message);
+  if (matches.length === 0) return { action: 'allow', text: message };
+  if (maxSeverity >= 4) return { action: 'block', matches };
+  return { action: 'censor', text: matcher.censor(message), matches };
+}
+```
+
+### 2. Censor a document
+
+```js
+const clean = matcher.censor(document);                       // full masking
+const soft = matcher.censor(document, { keepFirst: true });   // 'f***'
+const dashed = matcher.censor(document, { mask: '-' });
+```
+
+`censor` masks per grapheme cluster, so Devanagari and other Indic matches do
+not leave orphaned combining marks behind.
+
+### 3. English only
+
+```js
+import { createMatcher } from 'remove-profanity';
+import { english } from 'remove-profanity/data/en';
+
+const matcher = createMatcher({ packs: [english] });
+matcher.isClean(text);
+```
+
+### 4. Per-language matcher, chosen at request time
+
+```js
+import { createMatcher } from 'remove-profanity';
+import { english } from 'remove-profanity/data/en';
+import { hindi } from 'remove-profanity/data/hi';
+import { tamil } from 'remove-profanity/data/ta';
+
+// One matcher per locale, all built at startup.
+const matchers = {
+  en: createMatcher({ packs: [english] }),
+  hi: createMatcher({ packs: [english, hindi] }),
+  ta: createMatcher({ packs: [english, tamil] }),
+};
+
+export const check = (locale, text) =>
+  (matchers[locale] ?? matchers.en).isClean(text);
+```
+
+### 5. Strong slurs only, everything milder allowed
+
+```js
+const matcher = createMatcher({
+  packs: [hindi, english],
+  minSeverity: 3,
+  categories: ['slur', 'casteist', 'religious'],
+});
+```
+
+### 6. Flag for human review instead of blocking
+
+```js
+const matcher = createMatcher({ packs: [hindi, english], skeletonTier: 'flag' });
+
+for (const m of matcher.scan(text).matches) {
+  if (m.tier === 'skeleton' || m.casualUse) queueForReview(m);
+  else block(m);
+}
+```
+
+## Common mistakes
+
+1. **`minSeverity` defaults to `0`.** Every listed term is flagged, including
+   the mildest. If the product only wants strong profanity, set
+   `minSeverity: 3` explicitly. Do not assume low-severity entries are
+   advisory — only `minSeverity` makes them so.
+2. **Do not load all eleven packs by default.** It costs 33.71 ms of startup
+   and adds cross-language false positives (a word innocent in one Indian
+   language is listed in another). Load the languages the app actually needs.
+3. **Build the matcher once, at module scope.** Construction is 33.71 ms cold
+   and 11.50 ms warm; a check on a 10-word message is 0.003 ms. Building per
+   request is the single biggest performance mistake available here.
+4. **`isClean()` and `scan()` cost the same on clean text.** `isClean()` exits
+   early only when something matches. Choose by what you need back, not for
+   speed.
+5. **`maxSeverity` is `null`, not `0`, when the text is clean.** Test
+   `matches.length` or call `isClean()`; `maxSeverity === 0` is a real
+   severity level.
+6. **Masks at a token edge are not detected.** `f***`, `*uck`, `fuc*` are
+   deliberate misses (markdown italics and footnote asterisks would collide).
+   Interior masks — `f*ck`, `b***h` — are detected. Do not write a test that
+   expects `f***` to be caught.
+7. **`categories` filters, it does not rank.** A match is reported if it
+   carries ANY listed category.
+8. **`casualUse: true` annotates; it does not suppress.** Terms like `sa*la`
+   and the literal "pig" sense of `su*r` still appear in `matches`. Filter on
+   the flag yourself if you want lighter handling.
+9. **Spans index the original string.** Do not re-derive offsets from a
+   lowercased or normalized copy; `start`/`end` already point at the input.
+10. **The package is ESM.** `require('remove-profanity')` fails; use
+    `await import(...)` from CommonJS.
+11. **Adding a term is `customWords`, not editing the pack.** Terms added that
+    way get `severity: 2` and `categories: ['general']`; if you need a
+    different severity, filter on `language === 'custom'` yourself.
+12. **It does not detect the input language.** Pick packs from your own locale
+    signal.
+
+## Performance reference
+
+Median of 7 trials, node v22.22.3 on darwin/arm64, all eleven packs loaded.
+Full tables and methodology: `docs/benchmarks.md`, `benchmark/results.txt`.
+
+| Operation | Cost |
+|---|---|
+| `isClean()` on a 10-word message | 0.003 ms |
+| `isClean()` on a 1,000-word document | 0.102 ms |
+| `isClean()` on a 20,000-word ASCII document | 1.987 ms |
+| `isClean()` on 20,000 words of Devanagari | 6.359 ms |
+| `scan()` on a 20,000-word ASCII document | 1.910 ms |
+| `createMatcher` with 11 packs, cold | 33.71 ms |
+| `createMatcher` with 11 packs, warm rebuild | 11.50 ms |
+
+## Accuracy reference
+
+Against a 97-axis evasion battery owned and published by this project:
+
+- English evasion: 81 of 88 caught (92%). Second-best is 61 of 88.
+- All eleven languages: 801 of 952 evasion cases; 151 missed.
+- False positives: 3 of 486 clean cases.
+- Dictionary sweep: 464 hits over 1,771,208 English word forms, of which 46
+  are real headwords.
+- Speed: second of six on a 20,000-word Latin document. `leo-profanity` is 3x
+  faster and catches 18 of the 88 evasion cases.
+
+## Links
+
+These live in the source repository, not in the published tarball:
+
+- Usage guide: `docs/usage.md`
+- MCP server: `docs/mcp.md`
+- Matching internals and deliberate misses: `docs/matching.md`
+- Benchmarks in full: `docs/benchmarks.md`
+- Adding a language pack: `docs/language-packs.md`
+- Module contract: `SPEC.md`
+
+License: MIT. Word lists live in `src/data/` in the repository and in
+`dist/data/` in the tarball; they contain unmasked slurs by necessity.
