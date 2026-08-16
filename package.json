@@ -47,6 +47,14 @@
   ],
   "author": "DragonUncaged",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DragonUncaged/remove-profanity.git"
+  },
+  "homepage": "https://github.com/DragonUncaged/remove-profanity#readme",
+  "bugs": {
+    "url": "https://github.com/DragonUncaged/remove-profanity/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
